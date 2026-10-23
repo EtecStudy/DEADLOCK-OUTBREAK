@@ -1,68 +1,18 @@
-name: Fetch Supabase
+name: Test Push
 on:
   push:
     branches: [main]
 jobs:
-  fetch:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Download and push
-        id: dl
-        continue-on-error: true
-        env:
-          SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrbmR6YmtjbWdmYWlsdHh1d2llIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjE5NjgzOSwiZXhwIjoyMTA3NzcyODM5fQ.v9SQ7mdwpCPNqA4sAhZ8b16gP5m_8Kb9UUJgocSSOiI
-        run: |
-          set -x
-          git config user.email "arena@arena.ai"
-          git config user.name "Arena"
-          mkdir -p /tmp/dl
-          echo "DL Godot" | tee /tmp/debug.log
-          for f in Godot_v4.7.2-stable_linux.x86_64.zip.001 Godot_v4.7.2-stable_linux.x86_64.zip.002 Godot_v4.7.2-stable_linux.x86_64.zip.003; do
-            echo "Downloading $f" | tee -a /tmp/debug.log
-            curl -sL -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/$f" -o "/tmp/dl/$f" 2>&1 | tee -a /tmp/debug.log
-            ls -lh "/tmp/dl/$f" | tee -a /tmp/debug.log
-          done
-          echo "DL Blender" | tee -a /tmp/debug.log
-          for i in $(seq 1 11); do
-            f2=$(printf "blender-4.5.14-linux-x64.tar.zip.%03d" $i)
-            echo "Downloading $f2" | tee -a /tmp/debug.log
-            curl -sL -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/$f2" -o "/tmp/dl/$f2" 2>&1 | tee -a /tmp/debug.log
-            ls -lh "/tmp/dl/$f2" | tee -a /tmp/debug.log || echo "missing $f2" | tee -a /tmp/debug.log
-          done
-          ls -lh /tmp/dl/ | tee -a /tmp/debug.log
-          echo "Reconstruct" | tee -a /tmp/debug.log
-          cat /tmp/dl/Godot* > /tmp/godot_full.zip 2>&1 | tee -a /tmp/debug.log
-          cat /tmp/dl/blender* > /tmp/blender_full.tar.zip 2>&1 | tee -a /tmp/debug.log
-          ls -lh /tmp/*.zip | tee -a /tmp/debug.log
-          split -b 90M /tmp/blender_full.tar.zip /tmp/blender_part_ 2>&1 | tee -a /tmp/debug.log
-          ls -lh /tmp/blender_part_* | tee -a /tmp/debug.log
-          git checkout --orphan artifacts/godot-blender 2>&1 | tee -a /tmp/debug.log
-          git rm -rf . 2>&1 | tee -a /tmp/debug.log || true
-          mkdir -p artifacts
-          cp /tmp/godot_full.zip artifacts/ 2>&1 | tee -a /tmp/debug.log
-          cp /tmp/blender_part_* artifacts/ 2>&1 | tee -a /tmp/debug.log
-          ls -lh artifacts/ | tee -a /tmp/debug.log
-          git add artifacts/ 2>&1 | tee -a /tmp/debug.log
-          git commit -m "Add artifacts" 2>&1 | tee -a /tmp/debug.log
-          git push -f origin artifacts/godot-blender 2>&1 | tee -a /tmp/debug.log || echo "push fail" | tee -a /tmp/debug.log
-          cat /tmp/debug.log
-      - name: Push debug log
-        if: always()
-        run: |
-          set -x
-          git config user.email "arena@arena.ai"
-          git config user.name "Arena"
-          # Try to checkout debug branch
-          git fetch origin || true
-          git checkout --orphan debug-log || git checkout -b debug-log
-          git rm -rf . || true
-          mkdir -p debug
-          cp /tmp/debug.log debug/debug.log || echo "no debug log" > debug/debug.log
-          ls -lh debug/
-          cat debug/debug.log
-          git add debug/
-          git commit -m "Debug log" || true
-          git push -f origin debug-log || true
+      - run: |
+          git config user.email "test@test.com"
+          git config user.name "Test"
+          echo "hello from $(date)" > hello.txt
+          git checkout --orphan test-push-minimal
+          git add hello.txt
+          git commit -m "test push"
+          git push -f origin test-push-minimal
+          echo "push done"
