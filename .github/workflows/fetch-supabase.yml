@@ -6,58 +6,34 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Download and push artifacts
+      - name: Download and push
         env:
           SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrbmR6YmtjbWdmYWlsdHh1d2llIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjE5NjgzOSwiZXhwIjoyMTA3NzcyODM5fQ.v9SQ7mdwpCPNqA4sAhZ8b16gP5m_8Kb9UUJgocSSOiI
         run: |
-          set -x
           git config user.email "arena@arena.ai"
           git config user.name "Arena"
           mkdir -p /tmp/dl
-          echo "Downloading Godot parts..."
           for f in Godot_v4.7.2-stable_linux.x86_64.zip.001 Godot_v4.7.2-stable_linux.x86_64.zip.002 Godot_v4.7.2-stable_linux.x86_64.zip.003; do
-            echo "Downloading $f"
-            curl -v -L -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/$f" -o "/tmp/dl/$f" 2>&1 | head -20
-            ls -lh "/tmp/dl/$f" || echo "missing $f"
+            curl -sL -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/$f" -o "/tmp/dl/$f"
           done
-          echo "Downloading Blender parts..."
           for i in $(seq 1 11); do
             f2=$(printf "blender-4.5.14-linux-x64.tar.zip.%03d" $i)
-            echo "Downloading $f2"
-            curl -v -L -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/$f2" -o "/tmp/dl/$f2" 2>&1 | head -20
-            ls -lh "/tmp/dl/$f2" || echo "missing $f2"
+            curl -sL -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/$f2" -o "/tmp/dl/$f2"
           done
-          ls -lh /tmp/dl/ | tee /tmp/ls.log
-          echo "Reconstructing..."
-          cat /tmp/dl/Godot_v4.7.2-stable_linux.x86_64.zip.* > /tmp/godot_full.zip || echo "godot cat fail"
-          cat /tmp/dl/blender-4.5.14-linux-x64.tar.zip.* > /tmp/blender_full.tar.zip || echo "blender cat fail"
-          ls -lh /tmp/*.zip | tee -a /tmp/ls.log
-          split -b 95M /tmp/blender_full.tar.zip /tmp/blender_part_ || echo "split fail"
-          ls -lh /tmp/blender_part_* | tee -a /tmp/ls.log
-          ls -lh /tmp/godot_full.zip | tee -a /tmp/ls.log
-          git checkout --orphan artifacts/godot-blender || git checkout -b artifacts/godot-blender
+          cat /tmp/dl/Godot* > /tmp/godot_full.zip
+          cat /tmp/dl/blender* > /tmp/blender_full.tar.zip
+          ls -lh /tmp/*.zip
+          split -b 90M /tmp/blender_full.tar.zip /tmp/blender_part_
+          ls -lh /tmp/blender_part_*
+          git checkout --orphan artifacts/godot-blender
           git rm -rf . || true
           mkdir -p artifacts
-          cp /tmp/godot_full.zip artifacts/ || echo "cp godot fail"
-          cp /tmp/blender_part_* artifacts/ || echo "cp blender fail"
-          ls -lh artifacts/ | tee -a /tmp/ls.log
-          cat /tmp/ls.log
-          git add artifacts/ || true
-          git commit -m "Add artifacts" || true
-          git push -f origin artifacts/godot-blender 2>&1 | tee -a /tmp/ls.log || echo "push fail"
-          cat /tmp/ls.log
-          # Upload logs as artifact regardless
-          mkdir -p /tmp/artifacts-log
-          cp /tmp/ls.log /tmp/artifacts-log/ || true
-          cp /tmp/dl/* /tmp/artifacts-log/ 2>/dev/null || true
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: logs
-          path: /tmp/artifacts-log
-          retention-days: 1
+          cp /tmp/godot_full.zip artifacts/
+          cp /tmp/blender_part_* artifacts/
+          ls -lh artifacts/
+          git add artifacts/
+          git commit -m "Add artifacts"
+          git push -f origin artifacts/godot-blender
