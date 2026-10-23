@@ -9,47 +9,46 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Download from Supabase
+        with:
+          fetch-depth: 0
+      - name: Download and push artifacts
         env:
           SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrbmR6YmtjbWdmYWlsdHh1d2llIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjE5NjgzOSwiZXhwIjoyMTA3NzcyODM5fQ.v9SQ7mdwpCPNqA4sAhZ8b16gP5m_8Kb9UUJgocSSOiI
         run: |
+          git config user.email "arena@arena.ai"
+          git config user.name "Arena"
           mkdir -p /tmp/dl
           echo "Downloading Godot parts..."
           for f in Godot_v4.7.2-stable_linux.x86_64.zip.001 Godot_v4.7.2-stable_linux.x86_64.zip.002 Godot_v4.7.2-stable_linux.x86_64.zip.003; do
-            echo "Downloading $f"
-            curl -s -L -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/$f" -o "/tmp/dl/$f" -w "HTTP %{http_code} size %{size_download}\n"
-            ls -lh "/tmp/dl/$f"
+            curl -s -L -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/$f" -o "/tmp/dl/$f"
           done
           echo "Downloading Blender parts..."
           for i in $(seq 1 11); do
             f2=$(printf "blender-4.5.14-linux-x64.tar.zip.%03d" $i)
-            echo "Downloading $f2"
-            curl -s -L -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/$f2" -o "/tmp/dl/$f2" -w "HTTP %{http_code} size %{size_download}\n"
-            ls -lh "/tmp/dl/$f2" || echo "missing $f2"
+            curl -s -L -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/$f2" -o "/tmp/dl/$f2"
           done
           ls -lh /tmp/dl/
-          echo "Reconstructing Godot..."
-          cat /tmp/dl/Godot_v4.7.2-stable_linux.x86_64.zip.001 /tmp/dl/Godot_v4.7.2-stable_linux.x86_64.zip.002 /tmp/dl/Godot_v4.7.2-stable_linux.x86_64.zip.003 > /tmp/godot_full.zip
-          ls -lh /tmp/godot_full.zip
-          unzip -t /tmp/godot_full.zip | head -20
-          echo "Reconstructing Blender..."
+          echo "Reconstructing..."
+          cat /tmp/dl/Godot_v4.7.2-stable_linux.x86_64.zip.* > /tmp/godot_full.zip
           cat /tmp/dl/blender-4.5.14-linux-x64.tar.zip.* > /tmp/blender_full.tar.zip
-          ls -lh /tmp/blender_full.tar.zip
-          unzip -t /tmp/blender_full.tar.zip | head -5 || echo "not zip"
-          tar -tzf /tmp/blender_full.tar.zip | head -5 || echo "tar fail"
-          mkdir -p /tmp/artifacts
-          cp /tmp/godot_full.zip /tmp/artifacts/ || true
-          cp /tmp/blender_full.tar.zip /tmp/artifacts/ || true
-          ls -lh /tmp/artifacts/
-      - name: Upload godot
+          ls -lh /tmp/*.zip
+          # Split blender into 95M chunks for git push (<100M limit)
+          split -b 95M /tmp/blender_full.tar.zip /tmp/blender_part_
+          ls -lh /tmp/blender_part_* /tmp/godot_full.zip
+          # Create artifacts branch
+          git checkout --orphan artifacts/godot-blender
+          git rm -rf . || true
+          mkdir -p artifacts
+          cp /tmp/godot_full.zip artifacts/godot_full.zip
+          cp /tmp/blender_part_* artifacts/
+          ls -lh artifacts/
+          git add artifacts/
+          git commit -m "Add Godot and Blender artifacts"
+          git push -f origin artifacts/godot-blender
+          echo "Pushed to artifacts/godot-blender"
+      - name: Upload artifact fallback
         uses: actions/upload-artifact@v4
         with:
           name: godot-full
-          path: /tmp/artifacts/godot_full.zip
-          retention-days: 1
-      - name: Upload blender
-        uses: actions/upload-artifact@v4
-        with:
-          name: blender-full
-          path: /tmp/artifacts/blender_full.tar.zip
+          path: /tmp/godot_full.zip
           retention-days: 1
