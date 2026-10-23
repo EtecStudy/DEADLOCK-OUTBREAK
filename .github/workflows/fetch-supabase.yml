@@ -1,0 +1,30 @@
+name: Fetch Supabase
+on:
+  workflow_dispatch:
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download from Supabase
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          echo "Downloading Godot and Blender from Supabase..."
+          mkdir -p /tmp/dl
+          # Use curl with service_role to download each part
+          # List files via Supabase Storage API
+          curl -s -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/Godot_v4.7.2-stable_linux.x86_64.zip.001" -o /tmp/dl/Godot_v4.7.2-stable_linux.x86_64.zip.001 || echo "fail001"
+          curl -s -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/Godot_v4.7.2-stable_linux.x86_64.zip.002" -o /tmp/dl/Godot_v4.7.2-stable_linux.x86_64.zip.002 || echo "fail002"
+          curl -s -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/Godot_v4.7.2-stable_linux.x86_64.zip.003" -o /tmp/dl/Godot_v4.7.2-stable_linux.x86_64.zip.003 || echo "fail003"
+          ls -lh /tmp/dl/
+          cat /tmp/dl/Godot*.001 /tmp/dl/Godot*.002 /tmp/dl/Godot*.003 > /tmp/godot_full.zip || echo "cat fail"
+          ls -lh /tmp/*.zip /tmp/dl/
+          # Try to upload as artifact
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-full
+          path: /tmp/godot_full.zip
+          retention-days: 1
