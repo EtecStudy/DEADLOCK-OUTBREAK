@@ -1,13 +1,15 @@
 name: Fetch Supabase
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Download Godot from Supabase
+      - name: Download from Supabase
         env:
           SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrbmR6YmtjbWdmYWlsdHh1d2llIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjE5NjgzOSwiZXhwIjoyMTA3NzcyODM5fQ.v9SQ7mdwpCPNqA4sAhZ8b16gP5m_8Kb9UUJgocSSOiI
         run: |
@@ -19,9 +21,7 @@ jobs:
             ls -lh "/tmp/dl/$f"
           done
           echo "Downloading Blender parts..."
-          for i in $(seq -f "%03g" 1 11); do
-            f="blender-4.5.14-linux-x64.tar.zip.$(echo $i | sed 's/^0*//')"
-            # need zero pad handling: actual files are .001 to .011
+          for i in $(seq 1 11); do
             f2=$(printf "blender-4.5.14-linux-x64.tar.zip.%03d" $i)
             echo "Downloading $f2"
             curl -s -L -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" "https://tkndzbkcmgfailtxuwie.supabase.co/storage/v1/object/DEADLOCK%20OUTBREAK/$f2" -o "/tmp/dl/$f2" -w "HTTP %{http_code} size %{size_download}\n"
@@ -35,20 +35,19 @@ jobs:
           echo "Reconstructing Blender..."
           cat /tmp/dl/blender-4.5.14-linux-x64.tar.zip.* > /tmp/blender_full.tar.zip
           ls -lh /tmp/blender_full.tar.zip
-          unzip -t /tmp/blender_full.tar.zip | head -20 || echo "blender not zip?"
-          tar -tzf /tmp/blender_full.tar.zip | head -20 || echo "tar fail"
-          # Upload artifacts
+          unzip -t /tmp/blender_full.tar.zip | head -5 || echo "not zip"
+          tar -tzf /tmp/blender_full.tar.zip | head -5 || echo "tar fail"
           mkdir -p /tmp/artifacts
           cp /tmp/godot_full.zip /tmp/artifacts/ || true
           cp /tmp/blender_full.tar.zip /tmp/artifacts/ || true
           ls -lh /tmp/artifacts/
-      - name: Upload artifact godot
+      - name: Upload godot
         uses: actions/upload-artifact@v4
         with:
           name: godot-full
           path: /tmp/artifacts/godot_full.zip
           retention-days: 1
-      - name: Upload artifact blender
+      - name: Upload blender
         uses: actions/upload-artifact@v4
         with:
           name: blender-full
