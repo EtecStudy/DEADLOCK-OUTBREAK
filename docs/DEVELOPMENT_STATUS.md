@@ -3,7 +3,7 @@
 **Atualizado:** 2026-10-25 (America/Fortaleza)
 **Etapa 1:** 1.1–1.10 concluída conforme registro abaixo.
 **Etapa 2:** 2.1–2.10 concluída conforme resultados abaixo.
-**Etapa 3:** **REABERTA — correção obrigatória para FPS.** Os resultados de 3.1–3.10 registrados no histórico abaixo são da implementação anterior em terceira pessoa e não atendem à especificação corrigida. Escopo autorizado agora: somente 3.1; 3.2–3.10 não iniciadas nesta reexecução.
+**Etapa 3:** **CORREÇÃO FPS — 3.1 concluída e validada.** A implementação anterior 3.1–3.10 em terceira pessoa continua marcada apenas como histórico/superada. Na reexecução atual, somente 3.1 foi autorizada, testada e publicada; 3.2–3.10 permanecem não iniciadas e aguardam autorização.
 
 > Este documento é o registro atual de verificação do projeto. `docs/AMBIENTE.md` e `docs/FLUXO_WINDOWS.md` são notas históricas datadas de 2026-10-22/23; os dados de ambiente abaixo foram novamente verificados em 2026-10-25.
 >
@@ -223,14 +223,17 @@ O workflow `.github/workflows/build-windows.yml` publica uma Release somente qua
 
 Para cada subtarefa futura: concluir implementação e testes, descrever o que foi feito no commit e incluir o marcador de tag correspondente; acompanhar o Actions até a Release/artifact serem confirmados; atualizar o histórico; então parar e aguardar autorização para a próxima subtarefa. Builds de pushes comuns continuam gerando apenas o artifact, sem criar uma Release.
 
-As subtarefas concluídas antes desta política não receberam Releases individuais. A Release `v0.3.10` foi criada para o último estado anterior em terceira pessoa; após a correção da especificação, ela permanece preservada somente como registro histórico/superado e não prova conclusão FPS. A próxima Release da reexecução será `v0.3.1`, somente após todos os gates da subtarefa 3.1 passarem. Não reconstruir versões intermediárias antigas nem sobrescrever tags/assets publicados.
+As subtarefas concluídas antes desta política não receberam Releases individuais. A Release `v0.3.10` foi criada para o último estado anterior em terceira pessoa; após a correção da especificação, ela permanece preservada somente como registro histórico/superado e não prova conclusão FPS. A Release corrigida `v0.3.1` foi publicada depois de todos os gates de 3.1 passarem. Não reconstruir versões intermediárias antigas nem sobrescrever tags/assets publicados.
 
 ## Reexecução corrigida da Etapa 3 — 3.1
 
-**Status no commit de implementação:** implementação da cena FPS pronta para validação; GitHub Actions, exportação Windows e publicação `v0.3.1` ainda pendentes. Não há Godot nem PowerShell instalados localmente, portanto não declaro execução local do motor.
+**Status:** 3.1 validada e publicada como Release `v0.3.1`; build e gates concluídos pelo GitHub Actions `40208812699`. Não há Godot nem PowerShell instalados localmente, portanto não declaro execução local do motor.
 
 - Cena reutilizável: raiz `CharacterBody3D`; cápsula humana de 1,8 m (raio 0,32 m), origem apoiada no piso; `EyePivot` a 1,62 m com câmera direta `Camera3D` de FOV 75°.
 - Preparação estrutural sem implementar sistemas futuros: `WorldModelRoot`, `ViewModelRoot` e âncoras vazias `HandsAnchor` e `WeaponAnchor`. Sem corpo/mesh visível, `SpringArm3D`, movimentação, mouse look, sprint, captura do mouse, interação, combate, vida/inventário, inimigos ou multiplayer. A ação/binding `sprint` da implementação anterior foi retirada do `InputMap` até sua subtarefa autorizada.
 - Integração de contexto: cena principal substitui a arena genérica por blockout visual low-poly de cela e corredor de prisão, com porta gradeada fechada. É apenas geometria de apresentação; colisões do cenário e área de teste ficam para 3.2, sem lógica de abertura/interação.
-- Testes atualizados: smoke valida perspectiva FPS e integração; `player_physics_test.gd` (nome legado) valida somente a estrutura/cápsula/câmera/âncoras 3.1, não simula movimento/física futura; error test permanece. Resultado do pipeline será acrescentado após a execução.
-- Próximo passo após gates verdes: confirmar Artifact e Release `v0.3.1`, registrar links/resultados e parar, aguardando autorização para 3.2.
+- Testes atualizados: smoke valida perspectiva FPS e integração; `player_physics_test.gd` (nome legado) valida somente a estrutura/cápsula/câmera/âncoras 3.1, não simula movimento/física futura; error test permanece. Os três testes passaram no workflow (exit 0).
+- **Run:** [GitHub Actions #40208812699](https://github.com/EtecStudy/DEADLOCK-OUTBREAK/actions/runs/40208812699), commit de implementação `b9851cae1e94bbba2f9b80e5824bd2390af7d8ef`. Godot `4.7.2.stable.official`; import, testes, export PE x86_64, assinatura PCK, startup headless, ZIP/checksums e publicação concluídos com sucesso.
+- **Release:** [Deadlock Outbreak — Etapa 3.1 / v0.3.1](https://github.com/EtecStudy/DEADLOCK-OUTBREAK/releases/tag/v0.3.1), asset `DeadlockOutbreak-Windows-x86_64.zip` (39.201.689 bytes). Este asset da Release é a distribuição permanente. O Artifact do Actions `DeadlockOutbreak-Windows-x86_64` (ID `12604947875`, 39.201.873 bytes) está disponível até 2026-11-24; a retenção configurada no workflow é 30 dias.
+- **Limitação:** o container não tem Godot/PowerShell nem display; o pipeline Windows executou os testes/startup headless e validou o export, mas não houve inspeção visual com janela nem teste de mouse físico.
+- **Concluído:** publicar 3.1 e parar. Não iniciar 3.2 até autorização explícita do usuário.
