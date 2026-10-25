@@ -121,6 +121,33 @@ jobs:
             Write-Output "::notice title=Project test passed::$test exited with code 0."
           }
 
+      - name: Set subtask version metadata
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[release:v')
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $event = Get-Content -LiteralPath $env:GITHUB_EVENT_PATH -Raw | ConvertFrom-Json
+          $message = [string]$event.head_commit.message
+          $match = [regex]::Match($message, '\[release:v0\.(?<stage>[1-9][0-9]*)\.(?<subtask>[1-9][0-9]*)\]')
+          if (-not $match.Success) { throw 'Release marker must use [release:v0.<stage>.<subtask>].' }
+          $stage = [int]$match.Groups['stage'].Value
+          $subtask = [int]$match.Groups['subtask'].Value
+          if ($stage -gt 30 -or $subtask -gt 10) { throw 'Release marker is outside the planned Etapa 1–30 / subtarefa 1–10 range.' }
+          $releaseTag = "v0.$stage.$subtask"
+          $fileVersion = "0.$stage.$subtask.0"
+          $presetPath = Join-Path $PWD 'export_presets.cfg'
+          $presetText = Get-Content -LiteralPath $presetPath -Raw
+          foreach ($key in @('application/file_version', 'application/product_version')) {
+            $pattern = '(?m)^' + [regex]::Escape($key) + '="[^"]+"\r?$'
+            if ($presetText -notmatch $pattern) { throw "Export preset is missing version field $key." }
+            $replacement = $key + '="' + $fileVersion + '"'
+            $presetText = [regex]::Replace($presetText, $pattern, $replacement)
+          }
+          [System.IO.File]::WriteAllText($presetPath, $presetText, [System.Text.UTF8Encoding]::new($false))
+          "RELEASE_TAG=$releaseTag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "RELEASE_FILE_VERSION=$fileVersion" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Output "::notice title=Subtask version::$releaseTag; Windows file/product version $fileVersion."
+
       - name: Export and validate Windows build
         shell: pwsh
         run: |
@@ -168,6 +195,13 @@ jobs:
           }
           finally { $stream.Dispose() }
 
+          if ($env:RELEASE_FILE_VERSION) {
+            $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
+            if ($versionInfo.FileVersion -ne $env:RELEASE_FILE_VERSION) { throw "EXE FileVersion '$($versionInfo.FileVersion)' does not match release version $env:RELEASE_FILE_VERSION." }
+            if ($versionInfo.ProductVersion -ne $env:RELEASE_FILE_VERSION) { throw "EXE ProductVersion '$($versionInfo.ProductVersion)' does not match release version $env:RELEASE_FILE_VERSION." }
+            if ($versionInfo.ProductName -ne 'Deadlock Outbreak') { throw "Unexpected EXE ProductName: $($versionInfo.ProductName)." }
+          }
+
           $pckStream = [System.IO.File]::OpenRead($pck)
           try {
             $pckHeader = New-Object byte[] 4
@@ -196,6 +230,7 @@ jobs:
           $exeSize = (Get-Item -LiteralPath $exe).Length
           $pckSize = (Get-Item -LiteralPath $pck).Length
           $validationSummary = ("Godot {0}; EXE {1:N0} bytes; PCK {2:N0} bytes; PE machine x86_64 (0x8664); PCK GDPC signature; exported game startup completed without errors." -f $env:GODOT_VERSION, $exeSize, $pckSize)
+          if ($env:RELEASE_FILE_VERSION) { $validationSummary += " Release $env:RELEASE_TAG; EXE file/product version $env:RELEASE_FILE_VERSION." }
           Write-Host "Validated $validationSummary"
           Write-Output "::notice title=Windows export validated::$validationSummary"
 
@@ -250,7 +285,7 @@ jobs:
   publish-windows-release:
     name: Publish Windows build to GitHub Releases
     needs: export-windows-x86_64
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-windows-release]')
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[release:v')
     runs-on: windows-latest
     permissions:
       contents: write
@@ -268,11 +303,32 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $releaseTag = 'windows-x86_64-2026-10-25'
+          $event = Get-Content -LiteralPath $env:GITHUB_EVENT_PATH -Raw | ConvertFrom-Json
+          $commitMessage = [string]$event.head_commit.message
+          $match = [regex]::Match($commitMessage, '\[release:v0\.(?<stage>[1-9][0-9]*)\.(?<subtask>[1-9][0-9]*)\]')
+          if (-not $match.Success) { throw 'Commit message must include [release:v0.<stage>.<subtask>].' }
+          $stage = [int]$match.Groups['stage'].Value
+          $subtask = [int]$match.Groups['subtask'].Value
+          if ($stage -gt 30 -or $subtask -gt 10) { throw 'Release marker is outside the planned Etapa 1–30 / subtarefa 1–10 range.' }
+          $releaseTag = "v0.$stage.$subtask"
+          $implementation = [regex]::Replace($commitMessage, '\[release:v0\.[1-9][0-9]*\.[1-9][0-9]*\]', '').Trim()
+          if (-not $implementation) { throw 'Commit message must describe the completed subtask for the release notes.' }
           $zip = Get-ChildItem -Path 'release-asset' -Filter 'DeadlockOutbreak-Windows-x86_64.zip' -File -Recurse | Select-Object -First 1
           if (-not $zip -or $zip.Length -le 0) { throw 'The validated Windows ZIP was not downloaded from this workflow run.' }
-          $title = 'Deadlock Outbreak - Windows x86_64 (Godot 4.7.2)'
-          $notes = 'Validated Windows x86_64 build. Godot 4.7.2 stable official. Includes DeadlockOutbreak.exe, DeadlockOutbreak.pck, LEIA-ME.txt, and SHA256SUMS.txt. Source commit: ' + $env:GITHUB_SHA
+          $title = "Deadlock Outbreak - Etapa $stage.$subtask"
+          $tests = 'tests/project_smoke_test.gd, tests/project_error_test.gd, tests/player_physics_test.gd'
+          $notes = @(
+            "Etapa: $stage"
+            "Subtarefa: $stage.$subtask"
+            'Status: concluída; build e validações aprovados.'
+            'O que foi implementado:'
+            $implementation
+            "Testes realizados: $tests — todos passaram (exit code 0)."
+            'Build: Windows x86_64'
+            'Godot: 4.7.2 stable official'
+            'Validações: EXE PE x86_64, PCK GDPC, inicialização do jogo e ZIP com checksums.'
+            "Commit correspondente: $env:GITHUB_SHA"
+          ) -join "`n"
           $stdout = Join-Path $env:RUNNER_TEMP 'gh-release.stdout.log'
           $stderr = Join-Path $env:RUNNER_TEMP 'gh-release.stderr.log'
           Remove-Item -LiteralPath $stdout, $stderr -Force -ErrorAction SilentlyContinue

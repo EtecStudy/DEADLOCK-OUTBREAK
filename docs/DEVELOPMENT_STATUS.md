@@ -212,3 +212,11 @@ O preset `Windows Desktop` em `export_presets.cfg` usa x86_64, PCK externo e inc
 Removi o valor embutido de `.github/workflows/fetch-supabase.yml` e substituí por `${{ secrets.SUPABASE_SERVICE_KEY }}`; também removi `set -x` para que argumentos expandidos não sejam ecoados no log. Para esse workflow funcionar, configure o repository Actions Secret `SUPABASE_SERVICE_KEY` em **Settings → Secrets and variables → Actions**. O valor anterior já esteve publicado no repositório/histórico; rotacione-o no Supabase. Esse workflow não foi executado nesta tarefa.
 
 **Etapa 4 ainda não iniciada.**
+
+## Versionamento contínuo por subtarefa
+
+O workflow `.github/workflows/build-windows.yml` publica uma Release somente quando o commit da subtarefa aprovada contém um marcador de versão no formato `[release:v0.<etapa>.<subtarefa>]` (por exemplo, `[release:v0.3.10]`). A job de Release depende da conclusão de importação, testes, exportação, verificações PE/PCK, inicialização, ZIP e artifact; se algum passo falhar, a Release não é criada. A mesma execução define `application/file_version` e `application/product_version` do EXE como `0.<etapa>.<subtarefa>.0`. Tags existentes não são substituídas: uma colisão faz a publicação falhar em vez de sobrescrever uma versão anterior.
+
+Para cada subtarefa futura: concluir implementação e testes, descrever o que foi feito no commit e incluir o marcador de tag correspondente; acompanhar o Actions até a Release/artifact serem confirmados; atualizar o histórico; então parar e aguardar autorização para a próxima subtarefa. Builds de pushes comuns continuam gerando apenas o artifact, sem criar uma Release.
+
+As subtarefas concluídas antes desta política não receberam Releases individuais. A primeira versão retroativa corresponde ao último estado previamente validado, Etapa 3.10; não estou reconstruindo versões intermediárias de código que não foram exportadas e verificadas naquele momento.
