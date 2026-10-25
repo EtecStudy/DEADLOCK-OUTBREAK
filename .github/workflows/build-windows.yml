@@ -276,7 +276,7 @@ jobs:
           $stdout = Join-Path $env:RUNNER_TEMP 'gh-release.stdout.log'
           $stderr = Join-Path $env:RUNNER_TEMP 'gh-release.stderr.log'
           Remove-Item -LiteralPath $stdout, $stderr -Force -ErrorAction SilentlyContinue
-          & gh release create $releaseTag $zip.FullName --target $env:GITHUB_SHA --title $title --notes $notes 1> $stdout 2> $stderr
+          & gh release create $releaseTag $zip.FullName --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title $title --notes $notes 1> $stdout 2> $stderr
           $releaseExitCode = $LASTEXITCODE
           $releaseOutput = @()
           if (Test-Path -LiteralPath $stdout) { $releaseOutput += Get-Content -LiteralPath $stdout }
