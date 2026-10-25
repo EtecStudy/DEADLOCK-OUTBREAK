@@ -49,6 +49,7 @@ jobs:
             throw "Unexpected Godot editor version: $versionOutput"
           }
           Write-Host "Using official Godot editor: $versionOutput"
+          Write-Output "::notice title=Official Godot editor::$versionOutput"
 
           $template = Get-ChildItem -Path $templatesDir -Filter 'windows_release_x86_64.exe' -File -Recurse | Select-Object -First 1
           if (-not $template) { throw 'The official template archive is missing windows_release_x86_64.exe.' }
@@ -64,6 +65,7 @@ jobs:
           Copy-Item -Path (Join-Path $template.Directory.FullName '*') -Destination $templateInstall -Recurse -Force
           $installedTemplate = Join-Path $templateInstall 'windows_release_x86_64.exe'
           if (-not (Test-Path -LiteralPath $installedTemplate)) { throw 'Godot export template installation failed.' }
+          Write-Output "::notice title=Official export templates::Godot 4.7.2 stable Windows x86_64 template installed; version.txt matched $templateVersionText."
 
           "GODOT_EXE=$($godot.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "GODOT_VERSION=$versionOutput" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -72,8 +74,15 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          & $env:GODOT_EXE --headless --editor --path . --import
-          if ($LASTEXITCODE -ne 0) { throw "Godot resource import failed with exit code $LASTEXITCODE." }
+          $godotOutput = & $env:GODOT_EXE --headless --editor --path . --quit-after 600 2>&1
+          $godotExitCode = $LASTEXITCODE
+          $godotOutput | ForEach-Object { Write-Host $_ }
+          if ($godotExitCode -ne 0) {
+            $details = ($godotOutput | Select-Object -Last 12 | ForEach-Object { "$_" }) -join ' | '
+            $details = $details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Godot project scan/import failed::$details"
+            throw "Godot resource import failed with exit code $godotExitCode."
+          }
 
       - name: Run project tests before export
         shell: pwsh
@@ -87,8 +96,16 @@ jobs:
           foreach ($test in $tests) {
             if (-not (Test-Path -LiteralPath $test)) { throw "Required project test is missing: $test" }
             Write-Host "Running $test"
-            & $env:GODOT_EXE --headless --path . --script "res://$test"
-            if ($LASTEXITCODE -ne 0) { throw "Project test failed: $test (exit code $LASTEXITCODE)." }
+            $testOutput = & $env:GODOT_EXE --headless --path . --script "res://$test" 2>&1
+            $testExitCode = $LASTEXITCODE
+            $testOutput | ForEach-Object { Write-Host $_ }
+            if ($testExitCode -ne 0) {
+              $details = ($testOutput | Select-Object -Last 12 | ForEach-Object { "$_" }) -join ' | '
+              $details = $details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+              Write-Output "::error title=Project test failed ($test)::$details"
+              throw "Project test failed: $test (exit code $testExitCode)."
+            }
+            Write-Output "::notice title=Project test passed::$test exited with code 0."
           }
 
       - name: Export and validate Windows build
@@ -152,7 +169,9 @@ jobs:
 
           $exeSize = (Get-Item -LiteralPath $exe).Length
           $pckSize = (Get-Item -LiteralPath $pck).Length
-          Write-Host ("Validated Godot {0} Windows x86_64 PE executable ({1:N0} bytes) and GDPC PCK ({2:N0} bytes); exported game startup completed." -f $env:GODOT_VERSION, $exeSize, $pckSize)
+          $validationSummary = ("Godot {0}; EXE {1:N0} bytes; PCK {2:N0} bytes; PE machine x86_64 (0x8664); PCK GDPC signature; exported game startup completed without errors." -f $env:GODOT_VERSION, $exeSize, $pckSize)
+          Write-Host "Validated $validationSummary"
+          Write-Output "::notice title=Windows export validated::$validationSummary"
 
       - name: Prepare distribution ZIP and checksums
         shell: pwsh
@@ -189,7 +208,9 @@ jobs:
             if ($entries.Count -ne $expected.Count) { throw "Distribution ZIP has unexpected entries: $($entries -join ', ')" }
           }
           finally { $archive.Dispose() }
-          Write-Host ("Created {0} ({1:N0} bytes)." -f $zip, (Get-Item -LiteralPath $zip).Length)
+          $zipSize = (Get-Item -LiteralPath $zip).Length
+          Write-Host ("Created {0} ({1:N0} bytes)." -f $zip, $zipSize)
+          Write-Output "::notice title=Windows distribution ZIP created::DeadlockOutbreak-Windows-x86_64.zip ($zipSize bytes); verified EXE, PCK, LEIA-ME.txt, and SHA256SUMS.txt entries."
 
       - name: Upload Windows distribution artifact
         uses: actions/upload-artifact@v4
