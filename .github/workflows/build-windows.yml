@@ -74,8 +74,14 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $godotOutput = & $env:GODOT_EXE --headless --editor --path . --quit-after 600 2>&1
-          $godotExitCode = $LASTEXITCODE
+          $stdout = Join-Path $env:RUNNER_TEMP 'godot-import.stdout.log'
+          $stderr = Join-Path $env:RUNNER_TEMP 'godot-import.stderr.log'
+          Remove-Item -LiteralPath $stdout, $stderr -Force -ErrorAction SilentlyContinue
+          $process = Start-Process -FilePath $env:GODOT_EXE -ArgumentList @('--headless', '--editor', '--path', '.', '--quit-after', '600') -WorkingDirectory $PWD.Path -PassThru -Wait -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          $godotExitCode = $process.ExitCode
+          $godotOutput = @()
+          if (Test-Path -LiteralPath $stdout) { $godotOutput += Get-Content -LiteralPath $stdout }
+          if (Test-Path -LiteralPath $stderr) { $godotOutput += Get-Content -LiteralPath $stderr }
           $godotOutput | ForEach-Object { Write-Host $_ }
           if ($godotExitCode -ne 0) {
             $details = ($godotOutput | Select-Object -Last 12 | ForEach-Object { "$_" }) -join ' | '
@@ -96,8 +102,15 @@ jobs:
           foreach ($test in $tests) {
             if (-not (Test-Path -LiteralPath $test)) { throw "Required project test is missing: $test" }
             Write-Host "Running $test"
-            $testOutput = & $env:GODOT_EXE --headless --path . --script "res://$test" 2>&1
-            $testExitCode = $LASTEXITCODE
+            $testName = [System.IO.Path]::GetFileNameWithoutExtension($test)
+            $stdout = Join-Path $env:RUNNER_TEMP "$testName.stdout.log"
+            $stderr = Join-Path $env:RUNNER_TEMP "$testName.stderr.log"
+            Remove-Item -LiteralPath $stdout, $stderr -Force -ErrorAction SilentlyContinue
+            $process = Start-Process -FilePath $env:GODOT_EXE -ArgumentList @('--headless', '--path', '.', '--script', "res://$test") -WorkingDirectory $PWD.Path -PassThru -Wait -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+            $testExitCode = $process.ExitCode
+            $testOutput = @()
+            if (Test-Path -LiteralPath $stdout) { $testOutput += Get-Content -LiteralPath $stdout }
+            if (Test-Path -LiteralPath $stderr) { $testOutput += Get-Content -LiteralPath $stderr }
             $testOutput | ForEach-Object { Write-Host $_ }
             if ($testExitCode -ne 0) {
               $details = ($testOutput | Select-Object -Last 12 | ForEach-Object { "$_" }) -join ' | '
@@ -115,8 +128,21 @@ jobs:
           $outputDir = Join-Path $PWD 'build/windows'
           New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
-          & $env:GODOT_EXE --headless --path . --export-release 'Windows Desktop' 'build/windows/DeadlockOutbreak.exe'
-          if ($LASTEXITCODE -ne 0) { throw "Godot export failed with exit code $LASTEXITCODE." }
+          $exportStdout = Join-Path $env:RUNNER_TEMP 'godot-export.stdout.log'
+          $exportStderr = Join-Path $env:RUNNER_TEMP 'godot-export.stderr.log'
+          Remove-Item -LiteralPath $exportStdout, $exportStderr -Force -ErrorAction SilentlyContinue
+          $process = Start-Process -FilePath $env:GODOT_EXE -ArgumentList @('--headless', '--path', '.', '--export-release', '"Windows Desktop"', 'build/windows/DeadlockOutbreak.exe') -WorkingDirectory $PWD.Path -PassThru -Wait -RedirectStandardOutput $exportStdout -RedirectStandardError $exportStderr
+          $exportExitCode = $process.ExitCode
+          $exportOutput = @()
+          if (Test-Path -LiteralPath $exportStdout) { $exportOutput += Get-Content -LiteralPath $exportStdout }
+          if (Test-Path -LiteralPath $exportStderr) { $exportOutput += Get-Content -LiteralPath $exportStderr }
+          $exportOutput | ForEach-Object { Write-Host $_ }
+          if ($exportExitCode -ne 0) {
+            $details = ($exportOutput | Select-Object -Last 12 | ForEach-Object { "$_" }) -join ' | '
+            $details = $details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Godot export failed::$details"
+            throw "Godot export failed with exit code $exportExitCode."
+          }
 
           $exe = Join-Path $outputDir 'DeadlockOutbreak.exe'
           $pck = Join-Path $outputDir 'DeadlockOutbreak.pck'
