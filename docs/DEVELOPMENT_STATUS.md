@@ -3,7 +3,7 @@
 **Atualizado:** 2026-10-25 (America/Fortaleza)
 **Etapa 1:** 1.1–1.10 concluída conforme registro abaixo.
 **Etapa 2:** 2.1–2.10 concluída conforme resultados abaixo.
-**Etapa 3:** subtarefas técnicas 3.1–3.10 concluídas; etapa global **PARCIAL** porque o build Windows oficial foi configurado no CI, mas ainda não foi executado/validado e não há artifact. Interface gráfica/mouse físico também não foi testado visualmente. Ver estado do build abaixo.
+**Etapa 3:** **CONCLUÍDA (100% no escopo técnico/build)** — subtarefas 3.1–3.10 e build Windows oficial validados no GitHub Actions; artifact disponível. Interface gráfica/mouse físico ainda não foi testado visualmente; essa limitação está registrada abaixo.
 
 > Este documento é o registro atual de verificação do projeto. `docs/AMBIENTE.md` e `docs/FLUXO_WINDOWS.md` são notas históricas datadas de 2026-10-22/23; os dados de ambiente abaixo foram novamente verificados em 2026-10-25.
 
@@ -174,33 +174,41 @@ O engine de validação foi compilado de source somente para esta verificação 
 
 ## Build Windows obrigatório da Etapa 3
 
-**CI CONFIGURADO; BUILD E ARTIFACT AINDA NÃO VALIDADOS.**
+**SUCESSO — BUILD REAL E ARTIFACT VALIDADOS PELO GITHUB ACTIONS.**
 
-Foi adicionado o preset `Windows Desktop` em `export_presets.cfg` para x86_64, com PCK externo, todos os recursos de jogo incluídos e metadados do produto `Deadlock Outbreak`. Não há ícone próprio do jogo no projeto; a opção de ícone fica vazia, sem escolher uma imagem incidental. O preset fixa a saída esperada em `build/windows/DeadlockOutbreak.exe`.
+- **Execução:** [Build Windows (Godot 4.7.2) #1](https://github.com/EtecStudy/DEADLOCK-OUTBREAK/actions/runs/40201595155) — conclusão `success`, evento `push`, em 2026-10-25.
+- **Commit validado:** `348421d7059d5a06fd2906f742b5c72302d5e3f7` (`Run Godot commands with captured Windows output`).
+- **Branch:** `arena/75e76c79-deadlock-outbreak`.
+- **Runner:** `windows-latest`; todos os passos do job Windows x86_64 concluíram com sucesso.
+- **Godot:** `4.7.2.stable.official.ed1daf0bf`.
+- **Templates:** instalação do template oficial Godot 4.7.2 stable Windows x86_64 confirmada; `version.txt` correspondeu a `4.7.2.stable`.
 
-O workflow independente `.github/workflows/build-windows.yml` usa exclusivamente a distribuição oficial **Godot 4.7.2 stable** (editor Windows x86_64 e export templates da mesma release), num runner `windows-latest`. Em cada `push` e em execução manual, ele:
+### Testes e validação reais do run
 
-1. baixa e verifica a versão do editor e dos templates oficiais 4.7.2;
-2. importa os recursos e executa `project_smoke_test.gd`, `project_error_test.gd` e `player_physics_test.gd` antes da exportação;
-3. exporta o preset `Windows Desktop` em modo release;
-4. verifica existência/tamanho do EXE e PCK, cabeçalho PE x86_64, assinatura GDPC do PCK e inicialização headless do jogo exportado com inspeção de erros no log;
-5. monta `DeadlockOutbreak-Windows-x86_64.zip` com `DeadlockOutbreak.exe`, `DeadlockOutbreak.pck`, `LEIA-ME.txt` e `SHA256SUMS.txt`, validando entradas e tamanhos;
-6. publica o ZIP como artifact do GitHub Actions por 30 dias. Não cria GitHub Release.
+| Verificação | Resultado do GitHub Actions |
+|---|---|
+| Import/scan headless do projeto | PASS — passo `Import project resources` concluído |
+| `tests/project_smoke_test.gd` | PASS — exit code 0 |
+| `tests/project_error_test.gd` | PASS — exit code 0 |
+| `tests/player_physics_test.gd` | PASS — exit code 0 |
+| Exportação `Windows Desktop` release | PASS |
+| `build/windows/DeadlockOutbreak.exe` | Gerado e não vazio; **109.127.680 bytes** |
+| `build/windows/DeadlockOutbreak.pck` | Gerado e não vazio; **25.072 bytes**; assinatura `GDPC` validada |
+| Executável Windows | PE x86_64 validado; machine `0x8664` |
+| Inicialização do jogo exportado | PASS — execução headless terminou sem erro de engine/script |
+| ZIP `DeadlockOutbreak-Windows-x86_64.zip` | Criado, **39.205.123 bytes**; entradas EXE, PCK, `LEIA-ME.txt` e `SHA256SUMS.txt` verificadas |
+| Upload do artifact | PASS — artifact `DeadlockOutbreak-Windows-x86_64`, **39.205.307 bytes**, não expirado no momento da consulta; expira em 2026-11-24 |
 
-O arquivo `packaging/windows/LEIA-ME.txt` descreve execução e verificação dos hashes. O preset não exclui recursos de jogo; os filtros excluem apenas documentação, testes e ferramentas/demonstrações do repositório.
+O artifact está listado na execução acima e disponível para download na seção **Artifacts** dessa página. O artifact é o ZIP final; não foi criada GitHub Release automática. Os EXE/PCK foram produzidos no runner Windows, não no workspace Linux local.
 
-**Arquivos desta configuração:** `export_presets.cfg` (preset Windows), `.github/workflows/build-windows.yml` (CI), `packaging/windows/LEIA-ME.txt` (instruções do pacote) e este registro atualizado.
+### Tentativas anteriores e ressalvas
 
-### O que foi e não foi validado
+As duas primeiras execuções (`40201216865` e `40201423906`) falharam no passo `Import project resources`. O endpoint de arquivo de logs do Actions não pôde ser acessado por este sandbox, então não foi possível confirmar a mensagem/causa interna dessas falhas e não atribuo uma causa como fato. Após as tentativas, o import/scan foi executado pelo editor headless com saída redirecionada para diagnósticos; a terceira execução, listada acima, passou em todos os passos. O run bem-sucedido inclui avisos não bloqueantes de depreciação do runtime Node 20 em `actions/checkout@v4` e `actions/upload-artifact@v4`.
 
-- A configuração estática do preset foi conferida contra as opções do código-fonte oficial Godot 4.7.2: `binary_format/architecture="x86_64"`, `binary_format/embed_pck=false`, `application/product_name` e `application/file_description`.
-- **Não há `DeadlockOutbreak.exe`, `.pck`, ZIP nem artifact gerado nesta sessão.** O host de trabalho é Linux sem Godot CLI/templates Windows; não foi feita exportação local.
-- A lista remota consultada com `gh workflow list --all` contém somente `Test Push`; o novo workflow ainda não está publicado no GitHub. Por isso não foi possível executá-lo nem consultar resultado/artifact sem publicar as alterações. Nenhum sucesso de CI é alegado.
-- O histórico de testes 3.9/3.10 acima corresponde a um Godot 4.7.2 `custom_build` headless; não substitui a execução futura do workflow com Godot 4.7.2 stable oficial. O README/documentação histórica ainda menciona 4.4.1 e `project.godot` mantém o feature tag `4.4`; isso foi preservado, e a compatibilidade do projeto na exportação oficial será verificada pelo CI.
-- O download local anterior da release oficial não pôde prosseguir porque a API redirecionou para `release-assets.githubusercontent.com`, host não disponível neste sandbox; o workflow runner hospedado tentará obter os assets oficiais diretamente do GitHub.
+O preset `Windows Desktop` em `export_presets.cfg` usa x86_64, PCK externo e inclui recursos do jogo; a opção de ícone fica vazia porque não há ícone próprio no projeto. O workflow independente `.github/workflows/build-windows.yml` fixa a distribuição oficial Godot 4.7.2 stable, roda testes antes da exportação, valida PE/PCK/startup, gera hashes e envia artifact por 30 dias. Não exclui recursos de jogo; os filtros excluem documentação, testes e ferramentas/demonstrações do repositório.
 
-Depois que este workflow estiver no GitHub, use **Actions → Build Windows (Godot 4.7.2) → Run workflow**, ou faça push para dispará-lo; baixe `DeadlockOutbreak-Windows-x86_64` na execução concluída. Até um run passar e o artifact ser inspecionado, a Etapa 3 global permanece **PARCIAL**.
+### Credencial do workflow Supabase preexistente
 
-**Credencial do workflow Supabase preexistente:** removi o valor embutido de `.github/workflows/fetch-supabase.yml` e substituí por `${{ secrets.SUPABASE_SERVICE_KEY }}`; também removi `set -x` para que argumentos expandidos não sejam ecoados no log. Para esse workflow funcionar, configure o repository Actions Secret `SUPABASE_SERVICE_KEY` em **Settings → Secrets and variables → Actions**. O valor anterior já esteve publicado no repositório/histórico; rotacione-o no Supabase. Esse workflow não foi executado nesta tarefa.
+Removi o valor embutido de `.github/workflows/fetch-supabase.yml` e substituí por `${{ secrets.SUPABASE_SERVICE_KEY }}`; também removi `set -x` para que argumentos expandidos não sejam ecoados no log. Para esse workflow funcionar, configure o repository Actions Secret `SUPABASE_SERVICE_KEY` em **Settings → Secrets and variables → Actions**. O valor anterior já esteve publicado no repositório/histórico; rotacione-o no Supabase. Esse workflow não foi executado nesta tarefa.
 
 **Etapa 4 ainda não iniciada.**
