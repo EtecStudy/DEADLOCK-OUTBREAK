@@ -1,62 +1,31 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/player_controller.gd" id="1_player_controller"]
 
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_PlayerBody"]
-radius = 0.34
-height = 1.5
-
-[sub_resource type="SphereMesh" id="SphereMesh_PlayerHead"]
-radius = 0.23
-height = 0.46
-
-[sub_resource type="CapsuleShape3D" id="CapsuleShape_Player"]
-radius = 0.34
+[sub_resource type="CapsuleShape3D" id="PlayerCapsule"]
+radius = 0.32
 height = 1.8
-
-[sub_resource type="SphereShape3D" id="SphereShape_CameraArm"]
-radius = 0.2
-
-[sub_resource type="StandardMaterial3D" id="Material_PlayerBody"]
-albedo_color = Color(0.12, 0.48, 0.68, 1)
-roughness = 0.82
-
-[sub_resource type="StandardMaterial3D" id="Material_PlayerHead"]
-albedo_color = Color(0.88, 0.68, 0.48, 1)
-roughness = 0.82
 
 [node name="Player" type="CharacterBody3D"]
 script = ExtResource("1_player_controller")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 position = Vector3(0, 0.9, 0)
-shape = SubResource("CapsuleShape_Player")
+shape = SubResource("PlayerCapsule")
 
-[node name="BodyVisual" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.88, 0)
-mesh = SubResource("CapsuleMesh_PlayerBody")
-material_override = SubResource("Material_PlayerBody")
+[node name="WorldModelRoot" type="Node3D" parent="."]
 
-[node name="HeadVisual" type="MeshInstance3D" parent="."]
-position = Vector3(0, 1.61, 0)
-mesh = SubResource("SphereMesh_PlayerHead")
-material_override = SubResource("Material_PlayerHead")
+[node name="EyePivot" type="Node3D" parent="."]
+position = Vector3(0, 1.62, 0)
 
-[node name="ForwardMarker" type="MeshInstance3D" parent="."]
-position = Vector3(0, 1.57, -0.205)
-scale = Vector3(0.55, 0.35, 0.18)
-mesh = SubResource("SphereMesh_PlayerHead")
-material_override = SubResource("Material_PlayerBody")
-
-[node name="CameraPivot" type="Node3D" parent="."]
-position = Vector3(0, 1.75, 0)
-
-[node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot"]
-spring_length = 4.2
-margin = 0.12
-shape = SubResource("SphereShape_CameraArm")
-collision_mask = 1
-
-[node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D"]
+[node name="Camera3D" type="Camera3D" parent="EyePivot"]
 current = true
 fov = 75.0
+
+[node name="ViewModelRoot" type="Node3D" parent="EyePivot"]
+position = Vector3(0.22, -0.22, -0.35)
+
+[node name="HandsAnchor" type="Marker3D" parent="EyePivot/ViewModelRoot"]
+
+[node name="WeaponAnchor" type="Marker3D" parent="EyePivot/ViewModelRoot"]
+position = Vector3(0, -0.02, -0.22)

@@ -3,9 +3,11 @@
 **Atualizado:** 2026-10-25 (America/Fortaleza)
 **Etapa 1:** 1.1–1.10 concluída conforme registro abaixo.
 **Etapa 2:** 2.1–2.10 concluída conforme resultados abaixo.
-**Etapa 3:** **CONCLUÍDA (100% no escopo técnico/build)** — subtarefas 3.1–3.10 e build Windows oficial validados no GitHub Actions; artifact disponível. Interface gráfica/mouse físico ainda não foi testado visualmente; essa limitação está registrada abaixo.
+**Etapa 3:** **REABERTA — correção obrigatória para FPS.** Os resultados de 3.1–3.10 registrados no histórico abaixo são da implementação anterior em terceira pessoa e não atendem à especificação corrigida. Escopo autorizado agora: somente 3.1; 3.2–3.10 não iniciadas nesta reexecução.
 
 > Este documento é o registro atual de verificação do projeto. `docs/AMBIENTE.md` e `docs/FLUXO_WINDOWS.md` são notas históricas datadas de 2026-10-22/23; os dados de ambiente abaixo foram novamente verificados em 2026-10-25.
+>
+> **Retificação da Etapa 3 (2026-10-25):** a Release `v0.3.10` foi publicada pelo workflow anterior antes de a correção de perspectiva ser processada. Seu conteúdo usa `SpringArm3D` e câmera em terceira pessoa; a versão/tag/asset permanecem preservados como histórico, mas não são uma conclusão válida para a especificação FPS. A Release Windows `windows-x86_64-2026-10-25` também é preservada. A reexecução corrigida é sequencial: validar e publicar 3.1, depois parar; não avançar sem autorização explícita.
 
 ## Diagnóstico do ambiente
 
@@ -128,9 +130,11 @@ O engine de validação foi compilado de source somente para esta verificação 
 
 **Avisos/limitações do build:** o compilador emitiu warnings não fatais de código do próprio engine (ex.: variável não usada em OpenXR). O binário foi compilado somente para validação headless, não é um engine Windows/GUI; source, SCons e binário temporários foram removidos após os testes. A falta de display impede verificar visualmente janela/fullscreen e a plataforma Windows.
 
-## Etapa 3 — Protótipo do jogador
+## Etapa 3 — Protótipo do jogador (registro histórico da versão anterior)
 
-**3.1 CONCLUÍDA** — Criada a cena reutilizável `scenes/player/player.tscn`, com raiz `CharacterBody3D`, formas provisórias nativas (corpo/cabeça/marcador frontal) e estrutura de câmera `CameraPivot → SpringArm3D → Camera3D`. Verificação estática da estrutura/nós e sub-recursos: PASS. A primeira execução do verificador estático falhou por uma expectativa incorreta no próprio teste (ele esperava `None` para o parent raiz; o parser recebe string vazia); ajustada a asserção e repetido com PASS. O carregamento real foi confirmado no scan e no teste 3.9/3.10 com Godot 4.7.2.
+**Nota de validade:** os resultados 3.1–3.10 seguintes documentam o protótipo em terceira pessoa do estado anterior. São mantidos para auditoria, mas estão superados e não devem ser usados como prova de conclusão da Etapa 3 corrigida. A reexecução FPS está registrada ao final deste documento.
+
+**3.1 HISTÓRICO — SUPERADA** — Criada a cena reutilizável `scenes/player/player.tscn`, com raiz `CharacterBody3D`, formas provisórias nativas (corpo/cabeça/marcador frontal) e estrutura de câmera `CameraPivot → SpringArm3D → Camera3D`. Verificação estática da estrutura/nós e sub-recursos: PASS. A primeira execução do verificador estático falhou por uma expectativa incorreta no próprio teste (ele esperava `None` para o parent raiz; o parser recebe string vazia); ajustada a asserção e repetido com PASS. O carregamento real foi confirmado no scan e no teste 3.9/3.10 com Godot 4.7.2.
 
 **3.2 CONCLUÍDA** — Adicionada cápsula de colisão ao jogador e um blockout à main scene com piso `StaticBody3D`, obstáculo e parede de limite, todos com formas primitivas correspondentes. Auditoria estrutural confirmou 3 colisores estáticos e o player instance: PASS. O teste 3.9 confirmou apoio no chão, parede bloqueante e câmera recolhendo no obstáculo.
 
@@ -170,7 +174,7 @@ O engine de validação foi compilado de source somente para esta verificação 
 
 **Limitações e avisos de build:** não há display/Wayland, portanto não foi possível abrir janela, inspecionar enquadramento/cores/oclusão visual, sentir responsividade real ou confirmar captura do mouse pelo sistema operacional. O teste `Viewport.push_input()` verifica o pipeline e os limites, mas não substitui mouse físico. A primeira tentativa de compilar o editor abortou porque `pkg-config` não existia. Para a build temporária, usei um probe compatível local apenas para SCons e desliguei integrações de sistema opcionais ausentes; não instalei nem adicionei dependências ao projeto. Sem headers de fontconfig e backend GUI, o scan do editor escreve 10 mensagens `ERROR` do próprio engine dizendo que suporte a fontes do sistema está desativado. O scan, execução e testes do jogo terminaram com exit 0, sem erros de parse/runtime do projeto; as formas/fontes do protótipo não dependem de fontes do sistema. A build source/engine SCons e os logs foram removidos após os testes. Não houve commit, push nem staging.
 
-**Como executar e testar com uma instalação Godot 4:** abra o projeto ou execute `godot --path .` para iniciar a main scene, que monta a arena e o jogador. WASD movimenta, mouse olha, segurar Shift corre; Escape alterna captura/liberação do cursor e clique esquerdo recaptura. Rode os testes com `godot --headless --path . --script res://tests/project_smoke_test.gd`, `godot --headless --path . --script res://tests/project_error_test.gd` e `godot --headless --path . --script res://tests/player_physics_test.gd`.
+**Como executar e testar (reexecução FPS):** abra o projeto com Godot 4.7.2 ou execute `godot --path .` para iniciar a cena da cela e corredor de prisão, com a câmera na perspectiva dos olhos. Nesta subtarefa 3.1 não há movimento nem controle de mouse intencionalmente; eles permanecem para as subtarefas próprias. Para validar, rode os testes `tests/project_smoke_test.gd`, `tests/project_error_test.gd` e `tests/player_physics_test.gd` em modo headless. Os comandos e resultados efetivos da build Windows desta reexecução serão registrados após a execução do GitHub Actions.
 
 ## Build Windows obrigatório da Etapa 3
 
@@ -219,4 +223,14 @@ O workflow `.github/workflows/build-windows.yml` publica uma Release somente qua
 
 Para cada subtarefa futura: concluir implementação e testes, descrever o que foi feito no commit e incluir o marcador de tag correspondente; acompanhar o Actions até a Release/artifact serem confirmados; atualizar o histórico; então parar e aguardar autorização para a próxima subtarefa. Builds de pushes comuns continuam gerando apenas o artifact, sem criar uma Release.
 
-As subtarefas concluídas antes desta política não receberam Releases individuais. A primeira versão retroativa corresponde ao último estado previamente validado, Etapa 3.10; não estou reconstruindo versões intermediárias de código que não foram exportadas e verificadas naquele momento.
+As subtarefas concluídas antes desta política não receberam Releases individuais. A Release `v0.3.10` foi criada para o último estado anterior em terceira pessoa; após a correção da especificação, ela permanece preservada somente como registro histórico/superado e não prova conclusão FPS. A próxima Release da reexecução será `v0.3.1`, somente após todos os gates da subtarefa 3.1 passarem. Não reconstruir versões intermediárias antigas nem sobrescrever tags/assets publicados.
+
+## Reexecução corrigida da Etapa 3 — 3.1
+
+**Status no commit de implementação:** implementação da cena FPS pronta para validação; GitHub Actions, exportação Windows e publicação `v0.3.1` ainda pendentes. Não há Godot nem PowerShell instalados localmente, portanto não declaro execução local do motor.
+
+- Cena reutilizável: raiz `CharacterBody3D`; cápsula humana de 1,8 m (raio 0,32 m), origem apoiada no piso; `EyePivot` a 1,62 m com câmera direta `Camera3D` de FOV 75°.
+- Preparação estrutural sem implementar sistemas futuros: `WorldModelRoot`, `ViewModelRoot` e âncoras vazias `HandsAnchor` e `WeaponAnchor`. Sem corpo/mesh visível, `SpringArm3D`, movimentação, mouse look, sprint, captura do mouse, interação, combate, vida/inventário, inimigos ou multiplayer. A ação/binding `sprint` da implementação anterior foi retirada do `InputMap` até sua subtarefa autorizada.
+- Integração de contexto: cena principal substitui a arena genérica por blockout visual low-poly de cela e corredor de prisão, com porta gradeada fechada. É apenas geometria de apresentação; colisões do cenário e área de teste ficam para 3.2, sem lógica de abertura/interação.
+- Testes atualizados: smoke valida perspectiva FPS e integração; `player_physics_test.gd` (nome legado) valida somente a estrutura/cápsula/câmera/âncoras 3.1, não simula movimento/física futura; error test permanece. Resultado do pipeline será acrescentado após a execução.
+- Próximo passo após gates verdes: confirmar Artifact e Release `v0.3.1`, registrar links/resultados e parar, aguardando autorização para 3.2.

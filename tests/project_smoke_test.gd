@@ -6,7 +6,6 @@ const EXPECTED_ACTIONS := [
 	"move_backward",
 	"move_left",
 	"move_right",
-	"sprint",
 	"interact",
 	"primary_action",
 	"secondary_action",
@@ -70,23 +69,25 @@ func _run() -> void:
 	if controller_window_size != Vector2i(1280, 720):
 		errors.append("Window controller did not read the shared 1280x720 ProjectSettings")
 
-	var player_node := main_node.get_node_or_null("TestArena/Player") as CharacterBody3D
+	var player_node := main_node.get_node_or_null("PrisonCellBlockout/Player") as CharacterBody3D
 	if player_node == null:
-		errors.append("Main scene does not instance the reusable Player CharacterBody3D")
+		errors.append("Prison cell does not instance the reusable Player CharacterBody3D")
 	else:
 		if player_node.scene_file_path != "res://scenes/player/player.tscn":
-			errors.append("Main scene Player instance does not come from the reusable player scene")
+			errors.append("Prison cell Player instance does not come from the reusable player scene")
 		if player_node.get_node_or_null("CollisionShape3D") == null:
-			errors.append("Main scene Player has no collision shape")
-		var player_camera := player_node.get_node_or_null("CameraPivot/SpringArm3D/Camera3D") as Camera3D
+			errors.append("Prison cell Player has no collision shape")
+		var player_camera := player_node.get_node_or_null("EyePivot/Camera3D") as Camera3D
 		if player_camera == null or not player_camera.current:
-			errors.append("Main scene Player camera is missing or not current")
-	if main_node.get_node_or_null("TestArena/Floor") is not StaticBody3D:
-		errors.append("Main scene test arena has no solid floor")
-	if main_node.get_node_or_null("TestArena/Obstacle") is not StaticBody3D:
-		errors.append("Main scene test arena has no solid obstacle")
-	if main_node.get_node_or_null("TestArena/BoundaryWall") is not StaticBody3D:
-		errors.append("Main scene test arena has no solid boundary wall")
+			errors.append("Main scene Player eye-level first-person camera is missing or not current")
+		if player_node.get_node_or_null("EyePivot/SpringArm3D") != null:
+			errors.append("First-person Player must not contain a third-person SpringArm3D")
+	if main_node.get_node_or_null("PrisonCellBlockout/CellFloor") is not MeshInstance3D:
+		errors.append("Prison cell blockout has no visible floor mesh")
+	if main_node.get_node_or_null("PrisonCellBlockout/CellDoor") == null:
+		errors.append("Prison cell blockout has no barred cell door")
+	if main_node.get_node_or_null("PrisonCellBlockout/CorridorLeftWall") is not MeshInstance3D:
+		errors.append("Prison cell blockout has no visible adjoining corridor")
 
 	get_root().add_child(main_node)
 	await process_frame
@@ -122,10 +123,10 @@ func _run() -> void:
 
 func _finish(errors: Array[String], details: Dictionary) -> void:
 	if not errors.is_empty():
-		printerr("DEADLOCK_STAGE1_RESULT=" + JSON.stringify({"ok": false, "errors": errors, "details": details}))
+		printerr("DEADLOCK_PROJECT_SMOKE_RESULT=" + JSON.stringify({"ok": false, "errors": errors, "details": details}))
 		quit(1)
 		return
-	print("DEADLOCK_STAGE1_RESULT=" + JSON.stringify({
+	print("DEADLOCK_PROJECT_SMOKE_RESULT=" + JSON.stringify({
 		"ok": true,
 		"engine": Engine.get_version_info().string,
 		"details": details,
