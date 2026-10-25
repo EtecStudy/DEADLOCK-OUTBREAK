@@ -1,0 +1,34 @@
+DEADLOCK OUTBREAK — WINDOWS x86_64
+
+Este pacote contém uma exportação de distribuição do Deadlock Outbreak para
+Windows x86_64, gerada pelo editor e pelos templates oficiais do Godot 4.7.2
+stable. Não é necessário instalar o Godot para executar o jogo.
+
+ARQUIVOS
+- DeadlockOutbreak.exe: executável do jogo.
+- DeadlockOutbreak.pck: recursos e conteúdo exportado do projeto. Mantenha-o
+  na mesma pasta do executável.
+- SHA256SUMS.txt: hashes SHA-256 dos arquivos do pacote, exceto este próprio
+  arquivo de hashes e o ZIP que o contém.
+
+COMO EXECUTAR
+1. Extraia todos os arquivos do ZIP para uma pasta local.
+2. Mantenha DeadlockOutbreak.exe e DeadlockOutbreak.pck juntos.
+3. Abra DeadlockOutbreak.exe.
+
+REQUISITOS
+- Windows 10 ou posterior, 64 bits.
+- Os requisitos de hardware dependem da cena e dos recursos do projeto.
+
+VERIFICAÇÃO DE INTEGRIDADE (PowerShell)
+Na pasta extraída, execute:
+  Get-FileHash .\DeadlockOutbreak.exe -Algorithm SHA256
+  Get-FileHash .\DeadlockOutbreak.pck -Algorithm SHA256
+Compare os valores de DeadlockOutbreak.exe, DeadlockOutbreak.pck e LEIA-ME.txt
+com SHA256SUMS.txt. O arquivo SHA256SUMS.txt não contém o próprio hash.
+
+BUILD
+O pacote é publicado como artifact do workflow "Build Windows (Godot 4.7.2)"
+na aba Actions deste repositório. O workflow executa os testes do projeto,
+exporta com Godot 4.7.2 stable oficial e valida os arquivos antes de empacotar.
+Não é uma GitHub Release automática.

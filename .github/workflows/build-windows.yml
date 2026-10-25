@@ -1,0 +1,201 @@
+name: Build Windows (Godot 4.7.2)
+
+on:
+  push: {}
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  export-windows-x86_64:
+    name: Test and export Windows x86_64
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+
+      - name: Install official Godot 4.7.2 editor and export templates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+
+          $version = '4.7.2-stable'
+          $releaseBase = "https://github.com/godotengine/godot/releases/download/$version"
+          $work = Join-Path $env:RUNNER_TEMP 'godot-4.7.2'
+          $editorZip = Join-Path $work 'godot-editor.zip'
+          $templatesZip = Join-Path $work 'godot-templates.zip'
+          $editorDir = Join-Path $work 'editor'
+          $templatesDir = Join-Path $work 'templates-unpacked'
+          New-Item -ItemType Directory -Path $work, $editorDir, $templatesDir -Force | Out-Null
+
+          $editorUrl = "$releaseBase/Godot_v4.7.2-stable_win64.exe.zip"
+          $templatesUrl = "$releaseBase/Godot_v4.7.2-stable_export_templates.tpz"
+          & curl.exe --fail --location --retry 3 --output $editorZip $editorUrl
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to download the official Godot 4.7.2 Windows editor.' }
+          & curl.exe --fail --location --retry 3 --output $templatesZip $templatesUrl
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to download the official Godot 4.7.2 export templates.' }
+
+          Expand-Archive -LiteralPath $editorZip -DestinationPath $editorDir -Force
+          Expand-Archive -LiteralPath $templatesZip -DestinationPath $templatesDir -Force
+
+          $godot = Get-ChildItem -Path $editorDir -Filter 'Godot_v4.7.2-stable_win64.exe' -File -Recurse | Select-Object -First 1
+          if (-not $godot) { throw 'The official editor archive did not contain the expected Windows x86_64 executable.' }
+          $versionOutput = (& $godot.FullName --headless --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $versionOutput -notmatch '^4\.7\.2') {
+            throw "Unexpected Godot editor version: $versionOutput"
+          }
+          Write-Host "Using official Godot editor: $versionOutput"
+
+          $template = Get-ChildItem -Path $templatesDir -Filter 'windows_release_x86_64.exe' -File -Recurse | Select-Object -First 1
+          if (-not $template) { throw 'The official template archive is missing windows_release_x86_64.exe.' }
+          $templateVersion = Join-Path $template.Directory.FullName 'version.txt'
+          if (-not (Test-Path -LiteralPath $templateVersion)) { throw 'The official Windows export templates are missing version.txt.' }
+          $templateVersionText = (Get-Content -LiteralPath $templateVersion -Raw).Trim()
+          if ($templateVersionText -notmatch '4\.7\.2\.stable') {
+            throw "Export template version does not match Godot 4.7.2 stable: $templateVersionText"
+          }
+
+          $templateInstall = Join-Path $env:APPDATA 'Godot/export_templates/4.7.2.stable'
+          New-Item -ItemType Directory -Path $templateInstall -Force | Out-Null
+          Copy-Item -Path (Join-Path $template.Directory.FullName '*') -Destination $templateInstall -Recurse -Force
+          $installedTemplate = Join-Path $templateInstall 'windows_release_x86_64.exe'
+          if (-not (Test-Path -LiteralPath $installedTemplate)) { throw 'Godot export template installation failed.' }
+
+          "GODOT_EXE=$($godot.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "GODOT_VERSION=$versionOutput" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Import project resources
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & $env:GODOT_EXE --headless --editor --path . --import
+          if ($LASTEXITCODE -ne 0) { throw "Godot resource import failed with exit code $LASTEXITCODE." }
+
+      - name: Run project tests before export
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tests = @(
+            'tests/project_smoke_test.gd',
+            'tests/project_error_test.gd',
+            'tests/player_physics_test.gd'
+          )
+          foreach ($test in $tests) {
+            if (-not (Test-Path -LiteralPath $test)) { throw "Required project test is missing: $test" }
+            Write-Host "Running $test"
+            & $env:GODOT_EXE --headless --path . --script "res://$test"
+            if ($LASTEXITCODE -ne 0) { throw "Project test failed: $test (exit code $LASTEXITCODE)." }
+          }
+
+      - name: Export and validate Windows build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $outputDir = Join-Path $PWD 'build/windows'
+          New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+
+          & $env:GODOT_EXE --headless --path . --export-release 'Windows Desktop' 'build/windows/DeadlockOutbreak.exe'
+          if ($LASTEXITCODE -ne 0) { throw "Godot export failed with exit code $LASTEXITCODE." }
+
+          $exe = Join-Path $outputDir 'DeadlockOutbreak.exe'
+          $pck = Join-Path $outputDir 'DeadlockOutbreak.pck'
+          foreach ($path in @($exe, $pck)) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Export output is missing: $path" }
+            if ((Get-Item -LiteralPath $path).Length -le 0) { throw "Export output is empty: $path" }
+          }
+          if ((Get-Item -LiteralPath $exe).Length -lt 1MB) { throw 'The exported Windows executable is implausibly small.' }
+
+          $stream = [System.IO.File]::OpenRead($exe)
+          try {
+            $dosHeader = New-Object byte[] 64
+            if ($stream.Read($dosHeader, 0, $dosHeader.Length) -ne $dosHeader.Length) { throw 'Could not read the PE DOS header.' }
+            if ([System.Text.Encoding]::ASCII.GetString($dosHeader, 0, 2) -ne 'MZ') { throw 'The exported executable is not a Windows PE file (missing MZ signature).' }
+            $peOffset = [BitConverter]::ToInt32($dosHeader, 0x3c)
+            if ($peOffset -lt 64 -or $peOffset -gt ($stream.Length - 6)) { throw 'The Windows PE header offset is invalid.' }
+            [void]$stream.Seek($peOffset, [System.IO.SeekOrigin]::Begin)
+            $peHeader = New-Object byte[] 6
+            if ($stream.Read($peHeader, 0, $peHeader.Length) -ne $peHeader.Length) { throw 'Could not read the Windows PE header.' }
+            if ([System.Text.Encoding]::ASCII.GetString($peHeader, 0, 4) -ne "PE`0`0") { throw 'The exported executable has an invalid PE signature.' }
+            $machine = [BitConverter]::ToUInt16($peHeader, 4)
+            if ($machine -ne 0x8664) { throw ('Expected x86_64 PE machine 0x8664, got 0x{0:X4}.' -f $machine) }
+          }
+          finally { $stream.Dispose() }
+
+          $pckStream = [System.IO.File]::OpenRead($pck)
+          try {
+            $pckHeader = New-Object byte[] 4
+            if ($pckStream.Read($pckHeader, 0, 4) -ne 4 -or [System.Text.Encoding]::ASCII.GetString($pckHeader) -ne 'GDPC') {
+              throw 'The exported PCK is missing the Godot GDPC signature.'
+            }
+          }
+          finally { $pckStream.Dispose() }
+
+          $stdout = Join-Path $outputDir 'startup.stdout.log'
+          $stderr = Join-Path $outputDir 'startup.stderr.log'
+          Remove-Item -LiteralPath $stdout, $stderr -Force -ErrorAction SilentlyContinue
+          $process = Start-Process -FilePath $exe -ArgumentList @('--headless', '--quit-after', '3') -WorkingDirectory $outputDir -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          if (-not $process.WaitForExit(60000)) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            throw 'The exported game did not finish its headless startup check within 60 seconds.'
+          }
+          $process.Refresh()
+          if ($process.ExitCode -ne 0) { throw "The exported game startup check failed with exit code $($process.ExitCode)." }
+          $startupLog = @()
+          if (Test-Path -LiteralPath $stdout) { $startupLog += Get-Content -LiteralPath $stdout }
+          if (Test-Path -LiteralPath $stderr) { $startupLog += Get-Content -LiteralPath $stderr }
+          if (($startupLog -join "`n") -match '(?m)^(ERROR|SCRIPT ERROR|FATAL):') { throw 'The exported game startup log contains an engine or script error.' }
+          Remove-Item -LiteralPath $stdout, $stderr -Force -ErrorAction SilentlyContinue
+
+          $exeSize = (Get-Item -LiteralPath $exe).Length
+          $pckSize = (Get-Item -LiteralPath $pck).Length
+          Write-Host ("Validated Godot {0} Windows x86_64 PE executable ({1:N0} bytes) and GDPC PCK ({2:N0} bytes); exported game startup completed." -f $env:GODOT_VERSION, $exeSize, $pckSize)
+
+      - name: Prepare distribution ZIP and checksums
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path $PWD 'build/distribution'
+          $build = Join-Path $PWD 'build/windows'
+          $zip = Join-Path $PWD 'build/DeadlockOutbreak-Windows-x86_64.zip'
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          Copy-Item (Join-Path $build 'DeadlockOutbreak.exe') $stage
+          Copy-Item (Join-Path $build 'DeadlockOutbreak.pck') $stage
+          Copy-Item 'packaging/windows/LEIA-ME.txt' $stage
+
+          $lines = foreach ($name in @('DeadlockOutbreak.exe', 'DeadlockOutbreak.pck', 'LEIA-ME.txt')) {
+            $file = Join-Path $stage $name
+            $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $name"
+          }
+          [System.IO.File]::WriteAllLines((Join-Path $stage 'SHA256SUMS.txt'), [string[]]$lines, [System.Text.UTF8Encoding]::new($false))
+
+          Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+          Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
+          if (-not (Test-Path -LiteralPath $zip -PathType Leaf) -or (Get-Item -LiteralPath $zip).Length -le 0) { throw 'The Windows distribution ZIP was not created or is empty.' }
+
+          $expected = @('DeadlockOutbreak.exe', 'DeadlockOutbreak.pck', 'LEIA-ME.txt', 'SHA256SUMS.txt')
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            $entries = @($archive.Entries | ForEach-Object { $_.FullName })
+            foreach ($entry in $expected) {
+              if ($entry -notin $entries) { throw "Distribution ZIP is missing $entry." }
+              $found = $archive.GetEntry($entry)
+              if ($found.Length -le 0) { throw "Distribution ZIP contains an empty file: $entry" }
+            }
+            if ($entries.Count -ne $expected.Count) { throw "Distribution ZIP has unexpected entries: $($entries -join ', ')" }
+          }
+          finally { $archive.Dispose() }
+          Write-Host ("Created {0} ({1:N0} bytes)." -f $zip, (Get-Item -LiteralPath $zip).Length)
+
+      - name: Upload Windows distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeadlockOutbreak-Windows-x86_64
+          path: build/DeadlockOutbreak-Windows-x86_64.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
